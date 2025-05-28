@@ -1,0 +1,59 @@
+{{- if eq .Values.role "car" }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Values.pod.name }}
+  labels:
+    user: {{ .Values.labels.user }}
+    app: pros_car
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: k8s-work1  # 你原本用的 node，可以依需要調整
+  containers:
+    - name: pros-car
+      image: master.harbor.registry/ghcr/screamlab/pros_car_docker_image:latest
+      command: ["/bin/bash", "-c", "--"]
+      args: ["trap : TERM INT; sleep infinity & wait"]
+      envFrom:
+        - configMapRef:
+            name: pros-car-env  # 你 .sh 中的 --env-file 對應 ConfigMap
+      volumeMounts:
+        - name: src-volume
+          mountPath: /workspaces/src
+
+        - name: screenshots-volume
+          mountPath: /workspaces/screenshots
+        - name: app-pod
+          mountPath: /app_pod
+
+      resources:
+        requests:
+          memory: "256Mi"
+        # limits:
+        #   nvidia.com/gpu: 1  # 要啟用 GPU，需有 NVIDIA device plugin
+  restartPolicy: Never
+  volumes:
+    - name: src-volume
+      hostPath:
+        path: /home/work1/workspace/pros_car/src
+        type: Directory
+    - name: screenshots-volume
+      hostPath:
+        path: /home/work1/workspace/pros_car/screenshots
+        type: Directory
+    - name: app-pod
+      hostPath:
+        path: /home/work1/app_pod
+        type: Directory
+    
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pros-car-env
+data:
+  ROS_DOMAIN_ID: "{{ .Values.domain.id }}"
+  WHEEL_SPEED: "10"
+  ROS_DISCOVERY_SERVER: "{{ .Values.discover.ip }}"
+  RMW_IMPLEMENTATION: "rmw_fastrtps_cpp"
+{{- end }}

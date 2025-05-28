@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ros2-node
+description: A Helm chart for deploying a ROS 2 node as a Kubernetes Pod
+type: application
+version: 0.1.0
+appVersion: "humble"
