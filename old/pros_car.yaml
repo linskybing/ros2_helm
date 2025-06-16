@@ -8,7 +8,7 @@ metadata:
     app: pros_car
 spec:
   nodeSelector:
-    kubernetes.io/hostname: k8s-work1  # 你原本用的 node，可以依需要調整
+    kubernetes.io/hostname: k8s-work1
   containers:
     - name: pros-car
       image: master.harbor.registry/ghcr/screamlab/pros_car_docker_image:latest
@@ -16,15 +16,15 @@ spec:
       args: ["trap : TERM INT; sleep infinity & wait"]
       envFrom:
         - configMapRef:
-            name: pros-car-env  # 你 .sh 中的 --env-file 對應 ConfigMap
+            name: pros-car-env
       volumeMounts:
         - name: src-volume
           mountPath: /workspaces/src
-
         - name: screenshots-volume
           mountPath: /workspaces/screenshots
-        - name: app-pod
-          mountPath: /app_pod
+        - name: fastdds-config-volume
+          mountPath: /etc/fastdds
+          readOnly: true
 
       resources:
         requests:
@@ -41,11 +41,12 @@ spec:
       hostPath:
         path: /home/work1/workspace/pros_car/screenshots
         type: Directory
-    - name: app-pod
-      hostPath:
-        path: /home/work1/app_pod
-        type: Directory
-    
+    - name: fastdds-config-volume
+      configMap:
+        name: fastdds-super-config
+        items:
+        - key: super.xml
+          path: super.xml
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -56,4 +57,5 @@ data:
   WHEEL_SPEED: "10"
   ROS_DISCOVERY_SERVER: "{{ .Values.discover.ip }}"
   RMW_IMPLEMENTATION: "rmw_fastrtps_cpp"
+  FASTDDS_DEFAULT_PROFILES_FILE: "/etc/fastdds/super.xml"
 {{- end }}

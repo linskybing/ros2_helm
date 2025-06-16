@@ -19,6 +19,9 @@ spec:
         - name: demo-volume
           mountPath: /workspace/demo
           readOnly: true
+        - name: fastdds-config-volume
+          mountPath: /etc/fastdds
+          readOnly: true
       command: ["/bin/bash", "-c"]
       args:
         - |
@@ -48,7 +51,10 @@ spec:
           ephemeral-storage: "200Mi"
         limits:
           ephemeral-storage: "1Gi"
-
+      volumeMounts:
+        - name: fastdds-config-volume
+          mountPath: /etc/fastdds
+          readOnly: true
     # # -------------------- slam service --------------------
     - name: slam
       image: master.harbor.registry/ghcr/screamlab/pros_jetson_driver_image:0.1.0
@@ -58,6 +64,9 @@ spec:
       volumeMounts:
         - name: demo-volume
           mountPath: /workspace/demo
+          readOnly: true
+        - name: fastdds-config-volume
+          mountPath: /etc/fastdds
           readOnly: true
       command: ["/bin/bash", "-c"]
       args:
@@ -90,6 +99,10 @@ spec:
           ephemeral-storage: "200Mi"
         limits:
           ephemeral-storage: "1Gi"
+      volumeMounts:
+        - name: fastdds-config-volume
+          mountPath: /etc/fastdds
+          readOnly: true
 
   # -------------------- Shared volume definition --------------------
   volumes:
@@ -97,6 +110,12 @@ spec:
       hostPath:
         path: /home/work1/workspace/pros_app/docker/compose/demo # Replace with actual host path
         type: Directory
+    - name: fastdds-config-volume
+      configMap:
+        name: fastdds-super-config
+        items:
+        - key: super.xml
+          path: super.xml
 ---
 # Environment variable configuration (must create ConfigMap first)
 apiVersion: v1
@@ -107,4 +126,5 @@ data:
   ROS_DOMAIN_ID: "{{ .Values.domain.id }}"
   ROS_DISCOVERY_SERVER: "{{ .Values.discover.ip }}"
   RMW_IMPLEMENTATION: "rmw_fastrtps_cpp"
+  FASTDDS_DEFAULT_PROFILES_FILE: "/etc/fastdds/super.xml"
 {{- end }}

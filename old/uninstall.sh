@@ -2,11 +2,11 @@
 
 NAMESPACE=$USER
 
-helm uninstall ros-discovery-server -n $NAMESPACE
+# helm uninstall ros-discovery-server -n $NAMESPACE
 helm uninstall ros-slam-unity -n $NAMESPACE
 helm uninstall ros-car-control -n $NAMESPACE
 helm uninstall ros-bridges-service -n $NAMESPACE
-
+kubectl delete configmap fastdds-super-config -n $USER
 echo "Waiting for all resources in namespace $NAMESPACE to be deleted..."
 
 while true; do
@@ -16,6 +16,6 @@ while true; do
     break
   else
     echo "$remaining resources still exist... waiting."
-    sleep 10
+    sleep 2
   fi
 done

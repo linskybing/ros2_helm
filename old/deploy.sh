@@ -2,18 +2,23 @@
 
 
 NAMESPACE=$USER
-DOMAIN_ID=0
+DOMAIN_ID=32
 ROLE=discovery
 
-helm install ros-discovery-server . \
---namespace $NAMESPACE --create-namespace \
---set pod.name="ros2-discovery-server" \
---set role=$ROLE \
---set domain.id=$DOMAIN_ID
+# helm install ros-discovery-server . \
+# --namespace $NAMESPACE --create-namespace \
+# --set pod.name="ros2-discovery-server" \
+# --set role=$ROLE \
+# --set domain.id=$DOMAIN_ID
 
-kubectl wait --for=condition=Ready pod -l app=ros2-discovery-server --timeout=60s -n $NAMESPACE
+# kubectl wait --for=condition=Ready pod -l app=ros2-discovery-server --timeout=60s -n $NAMESPACE
 
-DISCOVERY_IP=$(kubectl get pod -l app=ros2-discovery-server -n $NAMESPACE -o jsonpath='{.items[0].status.podIP}')
+#export DISCOVERY_IP=$(kubectl get pod -l app=ros2-discovery-server -n $NAMESPACE -o jsonpath='{.items[0].status.podIP}')
+export DISCOVERY_IP="10.121.124.22:11811"
+
+envsubst < super.xml.template > super.xml
+
+kubectl create configmap fastdds-super-config --from-file=super.xml=super.xml -n $NAMESPACE
 
 helm install ros-slam-unity . \
 --namespace $NAMESPACE --create-namespace \
@@ -48,7 +53,7 @@ while true; do
     break
   else
     echo "$pending pods are still not ready... waiting."
-    sleep 10
+    sleep 2
   fi
 done
 

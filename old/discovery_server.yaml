@@ -22,4 +22,6 @@ spec:
         value: "{{ .Values.domain.id }}"
       - name: FASTRTPS_LOG_LEVEL
         value: "INFO"
+      - name: RMW_IMPLEMENTATION
+        value: "rmw_fastrtps_cpp"
 {{- end }}
