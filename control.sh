@@ -14,6 +14,7 @@ show_menu() {
     for i in "${!scripts[@]}"; do
         echo "$((i+1)). ${scripts[i]}"
     done
+    echo ""
     echo "s. Show running pod"
     echo "d. Shutdown pod"
     echo "e. Show service external ip"
