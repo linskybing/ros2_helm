@@ -151,10 +151,12 @@ shutdown_all_service() {
 }
 
 show_all_service() {
+    clear
     kubectl get all -n $namespace
 }
 
 delete_specific_pod() {
+    clear
     echo "Fetching pods in namespace: $namespace..."
 
     mapfile -t all_pods < <(kubectl get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name")
@@ -177,7 +179,7 @@ delete_specific_pod() {
         echo "$index. ${selectable_pods[$i]}"
     done
 
-    echo -n "Enter number of pod to delete: "
+    echo -n "Enter number of pod to delete (or other key to exit): "
     read choice
 
     if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#selectable_pods[@]} )); then
