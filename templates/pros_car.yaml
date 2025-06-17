@@ -29,8 +29,8 @@ spec:
       resources:
         requests:
           memory: "256Mi"
-        # limits:
-        #   nvidia.com/gpu: 1  # 要啟用 GPU，需有 NVIDIA device plugin
+        limits:
+          nvidia.com/gpu.shared: 1 
   restartPolicy: Never
   volumes:
     - name: src-volume
@@ -57,5 +57,5 @@ data:
   WHEEL_SPEED: "10"
   ROS_DISCOVERY_SERVER: "{{ .Values.discover.ip }}"
   RMW_IMPLEMENTATION: "rmw_fastrtps_cpp"
-  FASTDDS_DEFAULT_PROFILES_FILE: "/etc/fastdds/super.xml"
+  ROS_SUPER_CLIENT: "true"
 {{- end }}

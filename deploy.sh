@@ -5,16 +5,16 @@ NAMESPACE=$USER
 DOMAIN_ID=32
 ROLE=discovery
 
-# helm install ros-discovery-server . \
-# --namespace $NAMESPACE --create-namespace \
-# --set pod.name="ros2-discovery-server" \
-# --set role=$ROLE \
-# --set domain.id=$DOMAIN_ID
+helm install ros-discovery-server . \
+--namespace $NAMESPACE --create-namespace \
+--set pod.name="ros2-discovery-server" \
+--set role=$ROLE \
+--set domain.id=$DOMAIN_ID
 
-# kubectl wait --for=condition=Ready pod -l app=ros2-discovery-server --timeout=60s -n $NAMESPACE
+kubectl wait --for=condition=Ready pod -l app=ros2-discovery-server --timeout=60s -n $NAMESPACE
 
-#export DISCOVERY_IP=$(kubectl get pod -l app=ros2-discovery-server -n $NAMESPACE -o jsonpath='{.items[0].status.podIP}')
-export DISCOVERY_IP="10.121.124.22:11811"
+export DISCOVERY_IP=$(kubectl get pod -l app=ros2-discovery-server -n $NAMESPACE -o jsonpath='{.items[0].status.podIP}')
+# export DISCOVERY_IP="10.121.124.22:11811"
 
 envsubst < super.xml.template > super.xml
 

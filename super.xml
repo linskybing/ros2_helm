@@ -9,7 +9,7 @@
                         <discoveryServersList>
                             <locator>
                                 <udpv4>
-                                    <address>10.121.124.22:11811</address>
+                                    <address>192.168.182.201</address>
                                     <port>11811</port>
                                 </udpv4>
                             </locator>

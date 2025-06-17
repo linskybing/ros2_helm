@@ -1,23 +1,68 @@
-#! /bin/bash
+#!/bin/bash
 
 namespace=$USER
-
-scripts=()
-
-child_pids=()
+domain_id=
 registry=
 external_ip=
+declare -A scripts_by_dir
+scripts=()
+child_pids=()
+silent=false
+
+print_discovery_log=true
+discovery_server_name=ros2-discovery-server
+
+check_or_create_discovery_server() {
+    echo -n "Checking for existing discovery server pod..."
+    if ! kubectl get pod "$discovery_server_name" -n "$namespace" &>/dev/null; then
+        echo " not found. Creating..."
+        if [[ "$silent" == true ]]; then
+            if [[ "$print_discovery_log" == true ]]; then
+                helm install ros2-discovery-server . \
+                    --namespace $namespace --create-namespace \
+                    --set pod.name="ros2-discovery-server" \
+                    --set role=discovery \
+                    --set domain.id=$domain_id
+            else
+                helm install ros2-discovery-server . \
+                    --namespace $namespace --create-namespace \
+                    --set pod.name="ros2-discovery-server" \
+                    --set role=discovery \
+                    --set domain.id=$domain_id > /dev/null 2>&1
+            fi
+        else
+            helm install ros2-discovery-server . \
+                --namespace $namespace --create-namespace \
+                --set pod.name="ros2-discovery-server" \
+                --set role=discovery \
+                --set domain.id=$domain_id
+        fi
+        echo -n "Waiting for discovery server to be ready..."
+        kubectl wait --for=condition=Ready pod "$discovery_server_name" -n "$namespace" --timeout=30s || {
+            echo " Discovery server failed to start."
+        }
+    else
+        echo " already running."
+    fi
+}
 
 show_menu() {
     clear
     echo "Choose a script to run:"
-    for i in "${!scripts[@]}"; do
-        echo "$((i+1)). ${scripts[i]}"
+    i=1
+    for dir in $(printf "%s\n" "${!scripts_by_dir[@]}" | sort); do
+        echo "[$dir]"
+        mapfile -t dir_scripts < <(printf "%b" "${scripts_by_dir[$dir]}")
+        for script in "${dir_scripts[@]}"; do
+            echo "$i. $script"
+            scripts[$i]="$script"
+            ((i++))
+        done
     done
     echo ""
-    echo "s. Show running pod"
-    echo "d. Shutdown pod"
-    echo "e. Show service external ip"
+    echo "s. Show running pods"
+    echo "x. Delete specific pod"
+    echo "d. Shutdown all pods"
     echo "q. Quit"
 }
 
@@ -38,32 +83,70 @@ shutdown_all_service() {
     else
         echo "No Helm releases found in namespace: $namespace"
     fi
-
-    echo "Waiting for all resources in namespace $namespace to be deleted..."
 }
-
 
 show_all_service() {
     kubectl get all -n $namespace
 }
 
+delete_specific_pod() {
+    echo "Fetching pods in namespace: $namespace..."
+
+    mapfile -t all_pods < <(kubectl get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name")
+
+    selectable_pods=()
+    for pod in "${all_pods[@]}"; do
+        if [[ "$pod" != "$discovery_server_name" ]]; then
+            selectable_pods+=("$pod")
+        fi
+    done
+
+    if [[ ${#selectable_pods[@]} -eq 0 ]]; then
+        echo "No pods available for deletion (other than discovery server)."
+        return
+    fi
+
+    echo "Available pods to delete:"
+    for i in "${!selectable_pods[@]}"; do
+        index=$((i+1))
+        echo "$index. ${selectable_pods[$i]}"
+    done
+
+    echo -n "Enter number of pod to delete: "
+    read choice
+
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#selectable_pods[@]} )); then
+        echo "Invalid selection."
+        return
+    fi
+
+    selected_pod="${selectable_pods[$((choice-1))]}"
+    echo "Attempting to uninstall Helm release for pod: $selected_pod"
+    helm uninstall "$selected_pod" -n "$namespace" --wait
+}
+
 run_script() {
     local script=$1
-    local print_logs=$2  # Boolean to control whether to print logs or not
+    local print_logs=$2
 
     if [[ $print_logs == true ]]; then
         echo "Running $script with logs... Press 'b' to go back to menu without terminating, or 'q' to quit and terminate the process."
-        "$script" &
+        "$script" $domain_id &
     else
         echo "Running $script without logs... Press 'b' to go back to menu without terminating, or 'q' to quit and terminate the process."
-        "$script" > /dev/null 2>&1 &
+        "$script" $domain_id > /dev/null 2>&1 &
     fi
 
     script_pid=$!
     child_pids+=("$script_pid")
 
     while :; do
-        read -n 1 -s input
+        if ! kill -0 "$script_pid" 2>/dev/null; then
+            echo -e "\nProcess $script: $script_pid has finished."
+            child_pids=("${child_pids[@]/$script_pid}")
+            break
+        fi
+        read -n 1 -s -t 0.5 input
         if [[ $input == "q" ]]; then
             echo -e "\nTerminating $script: $script_pid..."
             if kill -0 "$script_pid" 2>/dev/null; then
@@ -83,65 +166,59 @@ run_script() {
     done
 }
 
-# Function to display help message
 print_help() {
-    echo "Usage: $0 [options] <script>"
+    echo "Usage: $0 [options]"
     echo "Options:"
-    echo "  -s, --silent      Run the script in silent mode (suppress logs)"
-    echo "  -h, --help        Show this help message and exit"
-    echo "Script:"
-    echo "  The script to execute (e.g., ./store_map.sh)."
+    echo "  -s, --silent               Run in silent mode (suppress script logs)"
+    echo "  --no-discovery-log         Suppress Helm discovery logs"
+    echo "  -h, --help                 Show this help message and exit"
     exit 0
 }
 
-# Default value for silent mode
-silent=false
-
-# Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -s|--silent) silent=true ;;  # Set silent mode
-        -h|--help) print_help ;;  # Print help and exit
+        -s|--silent) silent=true ;;
+        --no-discovery-log) print_discovery_log=false ;;
+        -h|--help) print_help ;;
     esac
     shift
 done
 
 while IFS= read -r -d '' file; do
-    scripts+=("$file")
-done < <(find ./scripts -maxdepth 1 -type f -name "*.sh" -print0 | sort -z)
+    dir=$(dirname "$file" | sed 's|^\./||')
+    relpath="./$dir/$(basename "$file")"
+    scripts_by_dir[$dir]+="$relpath\n"
+done < <(find ./scripts -type f -name "*.sh" -print0 | sort -z)
 
-# Main loop
 while true; do
     show_menu
 
     if [[ "$silent" == true ]]; then
-        echo "===== Running in silent mode ====="
+        echo "\n===== Running in silent mode ====="
     fi
 
-    read -p "Enter your choice: " choice
+    echo -n "Enter your choice: "
+    read choice
 
     if [[ $choice == "q" ]]; then
         break
     elif [[ $choice == "d" ]]; then
-        echo "Shutting down pod."
         shutdown_all_service
     elif [[ $choice == "s" ]]; then
         show_all_service
-    elif [[ $choice == "e" ]]; then
-        external_ip=$(kubectl get svc ros-bridges-service -n $namespace -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-        echo "Your Service's External IP: $external_ip"
-    elif [[ $choice =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#scripts[@]} )); then
-        selected_script="${scripts[$((choice-1))]}"
-        
-        # Determine if we want to print logs
-        if [[ "$silent" == false || $selected_script == "./store_map.sh" ]]; then
-            run_script "$selected_script" true  # Print logs if not in silent mode or if running store_map.sh
+    elif [[ $choice == "x" ]]; then
+        delete_specific_pod
+    elif [[ $choice =~ ^[0-9]+$ ]] && [[ -n "${scripts[$choice]}" ]]; then
+        check_or_create_discovery_server
+        selected_script="${scripts[$choice]}"
+        if [[ "$silent" == false || $selected_script == *"store_map.sh" ]]; then
+            run_script "$selected_script" true
         else
-            run_script "$selected_script" false  # Suppress logs for other scripts
+            run_script "$selected_script" false
         fi
     else
         echo "Invalid choice. Please try again."
     fi
-    echo "Press any key to continue..."
+    echo -n "Press any key to continue..."
     read -n 1 -s
 done

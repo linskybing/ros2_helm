@@ -2,7 +2,7 @@
 
 NAMESPACE=$USER
 
-# helm uninstall ros-discovery-server -n $NAMESPACE
+helm uninstall ros-discovery-server -n $NAMESPACE
 helm uninstall ros-slam-unity -n $NAMESPACE
 helm uninstall ros-car-control -n $NAMESPACE
 helm uninstall ros-bridges-service -n $NAMESPACE
