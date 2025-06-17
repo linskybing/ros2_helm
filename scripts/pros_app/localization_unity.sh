@@ -1,22 +1,20 @@
-#! /bin/bash
 
 domain_id=$1
 namespace=$USER
 workspace=$HOME/workspace
 release_name="ros2-bridges-service"
-
-if helm status "ros2-localization-unity" -n "$namespace" > /dev/null 2>&1; then
-    echo "Release ros2-localization-unity exists, uninstalling..."
-    helm uninstall "ros2-localization-unity" -n "$namespace" --wait
-fi
-
 export discovery_ip=$(kubectl get pod -l app=ros2-discovery-server -n $namespace -o jsonpath='{.items[0].status.podIP}'):11811
 
-helm install ros2-slam-unity . \
+if helm status "ros2-slam-unity" -n "$namespace" > /dev/null 2>&1; then
+    echo "Release ros2-slam-unity exists, uninstalling..."
+    helm uninstall "ros2-slam-unity" -n "$namespace" --wait
+fi
+
+helm install ros2-localization-unity . \
 --namespace $namespace --create-namespace \
---set pod.name="ros2-slam-unity" \
+--set pod.name="ros2-localization-unity" \
 --set labels.user=$USER \
---set role=slam-unity \
+--set role=localization-unity \
 --set domain.id=$domain_id \
 --set workspace.path=$workspace \
 --set discover.ip=$discovery_ip
@@ -50,7 +48,7 @@ while true; do
   sleep 1
 done
 
-if ! helm list -n "$namespace" | grep -q "^$release_name";  then
+if ! helm list -n "$namespace" | grep -q "^$release_name"; then
     external_ip=$(kubectl get svc ros2-bridges-service -n $namespace -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     echo "Your Service's External IP: $external_ip"
 fi
