@@ -1,0 +1,44 @@
+{{- if eq .Values.role "gps" }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Values.pod.name }}
+  labels:
+    user: {{ .Values.labels.user }}
+    app: gps
+spec:
+  containers:
+    # # -------------------- gps service --------------------
+    - name: gps
+      image: "{{ .Values.image.registry }}/screamlab/pros_gps:latest"
+      envFrom:
+        - configMapRef:
+            name: gps-env-config
+      volumeMounts:
+        - name: usb-gpu-device
+          mountPath: /dev/usb_gps
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          source /opt/ros/humble/setup.bash && \
+          source /workspaces/install/setup.bash && \
+          ros2 run pros_gps gps_publish
+
+  # -------------------- Shared volume definition --------------------
+  volumes:
+    - name: usb-gpu-device
+      hostPath:
+        path: /dev/usb_gps
+        type: CharDevice
+---
+# Environment variable configuration (must create ConfigMap first)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gps-env-config
+data:
+  ROS_DOMAIN_ID: "{{ .Values.domain.id }}"
+  ROS_DISCOVERY_SERVER: "{{ .Values.discover.ip }}"
+  RMW_IMPLEMENTATION: "rmw_fastrtps_cpp"
+  ROS_SUPER_CLIENT: "true"
+{{- end }}
